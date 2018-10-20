@@ -1,10 +1,8 @@
-/**
- * Created by Josh on 15/10/2018.
- */
 public class Btree implements ITree {
 
     private final int ORDER;
     private final int MAX;
+    private final int MIN;
     private Node root;
 
 
@@ -13,22 +11,9 @@ public class Btree implements ITree {
         this.root = null;
         this.ORDER = ORDER;
         this.MAX = ORDER -1;
+        MIN = (int) Math.ceil( (double) ORDER/2) -1;
     }
 
-    // set references for the node to be inserted
-    public void setReferences(int x, Node node, IntReference n) {
-
-        if(x < node.getKey()[1]) {
-            n.setReference(0);
-        } else {
-
-            n.setReference(node.getNumKeys());
-            while ((x < node.getKey()[n.getReference()]) && n.getReference() > 1) {
-                n.setReference(n.getReference() - 1);
-            }
-
-        }
-    }
 
     @Override
     public void insert(int x) {
@@ -61,7 +46,7 @@ public class Btree implements ITree {
         }
 
         IntReference intRef = new IntReference(0);
-        setReferences(x, node, intRef);
+        searchNode(x, node, intRef);
 
         boolean needSplit = insert(x, node.getChild()[intRef.getReference()], indexKey, indexKeyChild);
 
@@ -161,14 +146,212 @@ public class Btree implements ITree {
     }
 
     @Override
-    public boolean search(int x) {
-        //TODO
-        return false;
+    public void delete(int x) {
+        if (root == null) {
+            System.out.println("tree is empty");
+            return;
+        }
+
+        delete(x, root);
+
+        if (root != null && root.numKeys ==0) {
+            root = root.child[0];
+        }
+
+    }
+
+    private void delete(int x, Node node) {
+        IntReference n = new IntReference(0);
+        if(searchNode(x, node, n)) {
+            if (node.child[n.getReference()] == null) { // p is a leaf node
+                deleteByShift(node, n.getReference());
+                return;
+            } else { // deleting a non-leaf node
+                Node nonLeaf = node.child[n.getReference()];
+                while (nonLeaf.child[0] != null) {
+                    nonLeaf = nonLeaf.child[0];
+                }
+                node.key[n.getReference()] = nonLeaf.key[1];
+                delete(nonLeaf.key[1], node.child[n.getReference()]);
+            }
+        } else { /* key not found in node */
+            if (node.child[n.getReference()] == null) { /* p is a leaf node */
+                System.out.println("Value " + x + " not present in the tree");
+                return;
+            } else { /* p is a non leaf node */
+                delete(x, node.child[n.getReference()]);
+            }
+        }
+
+        if (node.child[n.getReference()].numKeys < MIN) {
+            restore(node, n.getReference());
+        }
+
+    }
+
+    private void deleteByShift(Node node, int n) {
+        for (int i = n + 1; i <= node.numKeys; i++) {
+            node.key[i -1] = node.key[i];
+            node.child[i-1] = node.child[i];
+        }
+        node.numKeys--;
+    }
+
+    // called when node.child[n] becomes underflow
+    private void restore(Node node, int n) {
+        if (n != 0 && node.child[n-1].numKeys > MIN) {
+            bottomLeft(node, n);
+        } else if (n != node.numKeys && node.child[n+1].numKeys > MIN) {
+            bottomRight(node, n);
+        } else {
+            if (n != 0) {
+                combine(node, n);
+            } else {
+                combine(node, n+1);
+            }
+        }
+    }
+
+    private void bottomLeft(Node node, int n) {
+        Node underflowNode = node.child[n];
+        Node leftSibling = node.child[n-1];
+
+        underflowNode.numKeys++;
+        // shift all the keys and children in underflow node one positon right
+        for (int i = underflowNode.numKeys; i > 0; i--) {
+            underflowNode.key[i+1] = underflowNode.key[i];
+            underflowNode.child[i+1] = underflowNode.child[i];
+
+        }
+        underflowNode.child[1] = underflowNode.child[0];
+
+        // move the separator key from the parent node p to underflow node
+        underflowNode.key[1] = node.key[n];
+
+        // move the right most key of the node left sibling to the parent node p
+        node.key[n] = leftSibling.key[leftSibling.numKeys];
+
+        // right most child of left sibling become left child of underflow node
+        underflowNode.child[0] = leftSibling.child[leftSibling.numKeys];
+
+        leftSibling.numKeys--;
+
+    }
+
+    private void bottomRight(Node node, int n) {
+        Node underflowNode = node.child[n];
+        Node rightSibling = node.child[n+1];
+
+        // move the separator key from the parentnode p to underflow node
+        underflowNode.numKeys++;
+        underflowNode.key[underflowNode.numKeys] = node.key[n + 1];
+
+        // left most child of rightsibling becomes the rightmost child of underflownode
+        underflowNode.child[underflowNode.numKeys] = rightSibling.child[0];
+
+        // move the leftmost key from rightsibling to parent node
+        node.key[n + 1] = rightSibling.key[1];
+        rightSibling.numKeys--;
+
+        // shift all the keys and children of rightsibling one position left
+        rightSibling.child[0] = rightSibling.child[1];
+
+        for (int i = 1; i <= rightSibling.key[i + 1]; i++) {
+            rightSibling.key[i] = rightSibling.key[i+1];
+            rightSibling.child[i] = rightSibling.child[i + 1];
+        }
+
+    }
+
+    private void combine(Node node, int m) {
+        Node node1 = node.child[m -1];
+        Node node2 = node.child[m];
+
+        node1.numKeys++;
+
+        // move the separator key from the parent node p to nodeA
+        node1.key[node1.numKeys] = node.key[m];
+
+        // shift the keys and children that are after the separator key in node p one postion left
+        int i;
+        for (i = m; i < node.numKeys; i++) {
+            node.key[i] = node.key[i+1];
+            node.child[i] = node.child[i + 1];
+        }
+
+        node.numKeys--;
+
+        // leftmost child of nodeb becomes right most child of nodeA
+        node1.child[node1.numKeys] = node2.child[0];
+
+        // insert all the keys and children of nodeb at the end of nodeA
+        for (i = 1; i <= node2.numKeys; i++) {
+            node1.numKeys++;
+            node1.key[node1.numKeys] = node2.key[i];
+            node1.child[node1.numKeys] = node2.child[i];
+        }
+
     }
 
     @Override
-    public int delete(int x) {
-        //TODO
-        return 0;
+    public boolean search(int x) {
+        if (search(x, root) == null) {
+            return false;
+        }
+        return true;
     }
+
+    public Node search(int x, Node node) {
+        if (node == null) {
+            return null;
+        }
+
+        IntReference n = new IntReference(0);
+
+        if(searchNode(x, node, n)) {
+            return node;
+        }
+
+        return search(x, node.child[n.getReference()]);
+
+
+    }
+
+    public boolean searchNode(int x, Node node, IntReference n) {
+
+        if(x < node.key[1]) {
+            n.setReference(0);
+            return false;
+        }
+
+        n.setReference(node.numKeys);
+
+        while ((x < node.key[n.getReference()]) && n.getReference() > 1) {
+            n.setReference(n.getReference()-1);
+        }
+
+        return x == node.key[n.getReference()];
+
+    }
+
+
+    public void inorder() {
+        inorder(root);
+    }
+
+    private void inorder(Node node) {
+
+        if (node == null) {
+            return;
+        }
+        int i;
+        for (i = 0; i < node.numKeys; i++) {
+            inorder(node.child[i]);
+            System.out.println(node.key[i+1] + " ");
+        }
+        inorder(node.child[i]);
+
+    }
+
 }
+

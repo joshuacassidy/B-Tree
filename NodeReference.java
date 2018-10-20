@@ -1,6 +1,3 @@
-/**
- * Created by Josh on 15/10/2018.
- */
 public class NodeReference {
 
     private Node reference;

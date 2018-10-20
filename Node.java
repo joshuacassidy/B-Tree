@@ -1,13 +1,10 @@
 import java.util.Arrays;
 
-/**
- * Created by Josh on 15/10/2018.
- */
 public class Node {
 
-    private int[] key;
-    private Node[] child;
-    private int numKeys;
+    public int[] key;
+    public Node[] child;
+    public int numKeys;
 
     public Node(int size) {
         this.numKeys = 0;
